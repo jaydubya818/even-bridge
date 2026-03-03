@@ -90,7 +90,7 @@ export async function toggleRecording() {
 
     if (S.isG2) {
       S.displayRebuilt = false;
-      rebuildGlassesDisplay("Recording...\n\nTap to stop");
+      rebuildGlassesDisplay("Recording...\n\nTap to stop", true);
     }
 
     if (S.isG2) {
@@ -105,7 +105,7 @@ export async function toggleRecording() {
     setStatus("Processing...");
 
     if (S.isG2) {
-      rebuildGlassesDisplay("Processing...");
+      rebuildGlassesDisplay("Processing...", true);
     }
 
     if (S.isG2) {

@@ -106,7 +106,7 @@ export function createApiRouter(getActiveMessenger: () => Messenger | null): Rou
         res.status(400).json({ error: "No messenger selected" });
         return;
       }
-      const messages = await messenger.getMessages(req.params.entityId, 4);
+      const messages = await messenger.getMessages(req.params.entityId, 6);
       res.json(messages);
     } catch (err) {
       console.error("Error fetching messages:", err);

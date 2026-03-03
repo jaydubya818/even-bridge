@@ -62,14 +62,15 @@ export function createGmailMessenger(): Messenger {
     return text.slice(0, maxLen) + "...";
   }
 
-  // Standard Gmail folders to show (in display order)
-  const folderMap: Record<string, string> = {
-    "INBOX": "Inbox",
-    "[Gmail]/Starred": "Starred",
-    "[Gmail]/Sent Mail": "Sent",
-    "[Gmail]/Drafts": "Drafts",
-    "[Gmail]/Important": "Important",
-    "[Gmail]/Spam": "Spam",
+  // Standard Gmail special-use folders to show (keyed by IMAP special-use attribute)
+  const specialUseMap: Record<string, string> = {
+    "\\Flagged": "Starred",
+    "\\Sent": "Sent",
+    "\\Drafts": "Drafts",
+    "\\Important": "Important",
+    "\\Junk": "Spam",
+    "\\Trash": "Trash",
+    "\\All": "Archive",
   };
 
   return {
@@ -101,7 +102,13 @@ export function createGmailMessenger(): Messenger {
       const folders: Folder[] = [];
 
       for (const mb of mailboxes) {
-        const displayName = folderMap[mb.path];
+        // Match Inbox by path, others by special-use attribute
+        let displayName: string | undefined;
+        if (mb.path === "INBOX") {
+          displayName = "Inbox";
+        } else if (mb.specialUse) {
+          displayName = specialUseMap[mb.specialUse];
+        }
         if (!displayName) continue;
 
         let unreadCount = 0;

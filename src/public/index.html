@@ -199,9 +199,16 @@
       font-family: var(--font-family-sans);
       letter-spacing: -0.03em;
       transition: background 0.15s;
+      overflow: hidden;
+      box-sizing: border-box;
     }
     #messageList button:active { background: var(--bc-3); }
     #messageList button.unread { border-left: 3px solid var(--bc-highlight); }
+    .email-from, .email-subject, .email-snippet {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .email-from { font-size: 15px; font-weight: 400; color: var(--tc-1); }
     .email-subject { font-size: 15px; font-weight: 300; color: var(--tc-1); margin-top: 2px; }
     .email-snippet { font-size: 13px; font-weight: 300; color: var(--tc-2); margin-top: 4px; }

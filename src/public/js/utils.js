@@ -36,7 +36,7 @@ export function sanitizeG2Name(name) {
   if (!name) return "Unknown";
   let clean = String(name).trim();
   if (!clean) return "Unknown";
-  if (clean.length > 28) clean = clean.slice(0, 28);
+  if (clean.length > 55) clean = clean.slice(0, 55);
   return clean;
 }
 

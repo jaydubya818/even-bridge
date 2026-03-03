@@ -12,7 +12,7 @@ import {
   goToFolderSelect, goToMessageList, goToMessageView,
   goToSettings, leaveSettings,
 } from "./state.js";
-import { showStartupScreen, updateGlassesMessengerSelection } from "./ui/glasses.js";
+import { showStartupScreen, updateGlassesMessengerSelection, updateGlassesConversationPage, updateGlassesMessageViewPage } from "./ui/glasses.js";
 
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
@@ -166,6 +166,8 @@ async function init() {
           toggleRecording();
         } else if (S.appState === "preview") {
           sendPendingMessage();
+        } else if (S.appState === "conversation") {
+          toggleRecording();
         } else if (S.appState === "messageView") {
           toggleRecording();
         }
@@ -175,9 +177,11 @@ async function init() {
         if (S.appState === "contacts") {
           goToMessengerSelect();
         } else if (S.appState === "conversation") {
-          toggleRecording();
+          goToContacts();
         } else if (S.appState === "messageView") {
           goToMessageList(S.session?.selectedFolder);
+        } else if (S.appState === "messageList") {
+          goToFolderSelect();
         } else if (S.appState === "folderSelect") {
           goToMessengerSelect();
         }
@@ -185,12 +189,28 @@ async function init() {
       // Scroll (1 or 2)
       else if (eventType === 1 || eventType === 2) {
         if (S.appState === "messengerSelect" && S.availableMessengers.length > 1) {
-          S.messengerSelectIndex = eventType === 2
+          S.messengerSelectIndex = eventType === 1
             ? Math.min(S.messengerSelectIndex + 1, S.availableMessengers.length - 1)
             : Math.max(S.messengerSelectIndex - 1, 0);
           updateGlassesMessengerSelection();
         } else if (S.appState === "conversation") {
-          goToContacts();
+          const maxPage = (S.conversationPages?.length || 1) - 1;
+          if (eventType === 1 && S.conversationPage < maxPage) {
+            S.conversationPage++;
+            updateGlassesConversationPage();
+          } else if (eventType === 2 && S.conversationPage > 0) {
+            S.conversationPage--;
+            updateGlassesConversationPage();
+          }
+        } else if (S.appState === "messageView") {
+          const maxPage = (S.messageViewPages?.length || 1) - 1;
+          if (eventType === 1 && S.messageViewPage < maxPage) {
+            S.messageViewPage++;
+            updateGlassesMessageViewPage();
+          } else if (eventType === 2 && S.messageViewPage > 0) {
+            S.messageViewPage--;
+            updateGlassesMessageViewPage();
+          }
         } else if (S.appState === "preview") {
           cancelPreview();
         }

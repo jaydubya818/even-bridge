@@ -47,6 +47,10 @@ export const S = {
   wakeLock: null,
   pageAbort: new AbortController(),
   displayRebuilt: false,
+  conversationPages: [],
+  conversationPage: 0,
+  messageViewPages: [],
+  messageViewPage: 0,
 
   // --- Messenger selection ---
   availableMessengers: [],
@@ -58,7 +62,7 @@ export const S = {
   // Shape depends on messenger type — see createChatSession / createFolderSession
   session: null,
 
-  BUILD_VERSION: "v1.3.2",
+  BUILD_VERSION: "v1.3.3",
 };
 
 // --- Wake lock ---
@@ -89,8 +93,13 @@ export function startConversationPolling() {
       const entityId = S.session.selectedContact.username || S.session.selectedContact.id;
       const msgs = await fetchMessages(entityId);
       if (S.appState !== "conversation") return;
+      const newKey = JSON.stringify(msgs);
+      const changed = newKey !== S._lastConvKey;
+      S._lastConvKey = newKey;
       S.session.conversationMessages = msgs;
-      if (S.isG2) showGlassesConversation();
+      if (S.isG2 && changed && S.conversationPage === 0) {
+        showGlassesConversation();
+      }
       showBrowserConversation();
     } catch {}
   }, 5000);
@@ -243,7 +252,7 @@ export async function goToContacts() {
       log(`Error loading contacts (attempt ${attempt}): ` + e.message);
       if (attempt > maxRetries) {
         setStatus("Connection failed", "error");
-        rebuildGlassesDisplay("Connection failed.\nReturning to main screen...");
+        rebuildGlassesDisplay("Connection failed.\nReturning to main screen...", true);
         setTimeout(() => goToMessengerSelect(), 3000);
         return;
       }
@@ -253,7 +262,7 @@ export async function goToContacts() {
 
   if (S.session.contacts.length === 0) {
     setStatus("No contacts found", "error");
-    rebuildGlassesDisplay("No contacts found");
+    rebuildGlassesDisplay("No contacts found", true);
     showBrowserContacts(() => {});
     return;
   }
@@ -272,6 +281,8 @@ export async function goToContacts() {
 export async function goToConversation(contact) {
   S.session.selectedContact = contact;
   S.appState = "conversation";
+  S.conversationPage = 0;
+  S._lastConvKey = null;
   log(`Selected contact: ${contact.name}`);
   requestWakeLock();
 
@@ -296,7 +307,7 @@ export async function goToConversation(contact) {
       log(`Error loading messages (attempt ${attempt}): ` + e.message);
       if (attempt > maxRetries) {
         setStatus("Connection failed", "error");
-        rebuildGlassesDisplay("Connection failed.\nReturning to contacts...");
+        rebuildGlassesDisplay("Connection failed.\nReturning to contacts...", true);
         setTimeout(() => goToContacts(), 3000);
         return;
       }
@@ -307,6 +318,7 @@ export async function goToConversation(contact) {
     S.session.conversationMessages = [];
   }
 
+  S._lastConvKey = JSON.stringify(S.session.conversationMessages);
   setStatus(`Conversation with ${contact.name}`);
 
   if (S.isG2) {
@@ -318,6 +330,9 @@ export async function goToConversation(contact) {
 
 export async function refreshConversation() {
   if (!S.session?.selectedContact) return;
+  S.conversationPage = 0;
+  S.displayRebuilt = false;
+  S._lastConvKey = null;
   try {
     const entityId = S.session.selectedContact.username || S.session.selectedContact.id;
     S.session.conversationMessages = await fetchMessages(entityId);
@@ -361,14 +376,14 @@ export async function goToFolderSelect() {
   } catch (e) {
     log("Error loading folders: " + e.message);
     setStatus("Connection failed", "error");
-    rebuildGlassesDisplay("Connection failed.\nReturning...");
+    rebuildGlassesDisplay("Connection failed.\nReturning...", true);
     setTimeout(() => goToMessengerSelect(), 3000);
     return;
   }
 
   if (S.session.folders.length === 0) {
     setStatus("No folders found", "error");
-    rebuildGlassesDisplay("No folders found");
+    rebuildGlassesDisplay("No folders found", true);
     return;
   }
 
@@ -382,6 +397,10 @@ export async function goToFolderSelect() {
 }
 
 export async function goToMessageList(folder) {
+  if (!folder) {
+    goToFolderSelect();
+    return;
+  }
   S.session.selectedFolder = folder;
   S.session.selectedMessage = null;
   S.appState = "messageList";
@@ -401,14 +420,14 @@ export async function goToMessageList(folder) {
   } catch (e) {
     log("Error loading messages: " + e.message);
     setStatus("Connection failed", "error");
-    rebuildGlassesDisplay("Connection failed.\nReturning...");
+    rebuildGlassesDisplay("Connection failed.\nReturning...", true);
     setTimeout(() => goToFolderSelect(), 3000);
     return;
   }
 
   if (S.session.folderMessages.length === 0) {
     setStatus("No messages", "error");
-    rebuildGlassesDisplay("No messages in folder");
+    rebuildGlassesDisplay("No messages in folder", true);
     showBrowserMessageList(() => {});
     return;
   }
@@ -460,7 +479,7 @@ export function sendPendingMessage() {
     setStatus("Sending reply...");
     if (S.isG2) {
       S.displayRebuilt = false;
-      rebuildGlassesDisplay("Sending reply...");
+      rebuildGlassesDisplay("Sending reply...", true);
     }
     if (S.ws && S.ws.readyState === WebSocket.OPEN) {
       S.ws.send(JSON.stringify({
@@ -479,7 +498,7 @@ export function sendPendingMessage() {
   setStatus("Sending...");
   if (S.isG2) {
     S.displayRebuilt = false;
-    rebuildGlassesDisplay("Sending...");
+    rebuildGlassesDisplay("Sending...", true);
   }
 
   const recipient = S.session.selectedContact.username || S.session.selectedContact.id;
@@ -520,7 +539,7 @@ export function handleServerMessage(msg) {
   } else if (msg.type === "status") {
     setStatus(msg.text);
     if (S.isG2 && S.displayRebuilt) {
-      rebuildGlassesDisplay(msg.text);
+      rebuildGlassesDisplay(msg.text, true);
     }
     log("Status: " + msg.text);
   } else if (msg.type === "preview") {
@@ -557,7 +576,7 @@ export function handleServerMessage(msg) {
 
     if (S.isG2) {
       S.displayRebuilt = false;
-      rebuildGlassesDisplay("Error:\n" + msg.text);
+      rebuildGlassesDisplay("Error:\n" + msg.text, true);
     }
 
     setTimeout(() => {
