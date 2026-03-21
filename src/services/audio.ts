@@ -59,3 +59,18 @@ export async function transcribeAudio(pcmBuffer: Buffer): Promise<string> {
 
   return response.text;
 }
+
+/**
+ * Transcribe with optional interim results for overlay/streaming.
+ * Returns final transcription. Today: one-shot; calls callback(fullText, true) once.
+ * When streaming STT is available: call callback(partial, false) for each interim,
+ * then callback(fullText, true) for the final.
+ */
+export async function transcribeWithInterim(
+  pcmBuffer: Buffer,
+  callback: (text: string, isFinal: boolean) => void
+): Promise<string> {
+  const full = (await transcribeAudio(pcmBuffer)).trim();
+  if (full) callback(full, true);
+  return full;
+}

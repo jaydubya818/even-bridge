@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "http";
-import { transcribeAudio } from "./services/audio.js";
+import { transcribeAudio, transcribeWithInterim } from "./services/audio.js";
 import { saveLastRecipient } from "./services/lastRecipient.js";
 import { createMessenger } from "./messengers/index.js";
 import type { Messenger } from "./messengers/types.js";
@@ -60,13 +60,25 @@ export function attachWebSocket(server: Server, ctx: WebSocketContext): void {
           ws.send(JSON.stringify({ type: "status", text: "Transcribing..." }));
 
           try {
-            const transcription = await transcribeAudio(pcmBuffer);
-            console.log(`Transcription: "${transcription}"`);
-
-            if (transcription.trim()) {
-              ws.send(JSON.stringify({ type: "preview", text: transcription }));
+            if (process.env.DEV_MEETING_ASSISTANT_OVERLAY === "true") {
+              // Single transcription path: interims (when streaming STT exists) then final; send preview on final.
+              const transcription = await transcribeWithInterim(pcmBuffer, (text, isFinal) => {
+                ws.send(JSON.stringify({ type: "bridge_transcript", text, isFinal }));
+              });
+              if (transcription) {
+                ws.send(JSON.stringify({ type: "preview", text: transcription }));
+                console.log(`Transcription: "${transcription}"`);
+              } else {
+                ws.send(JSON.stringify({ type: "error", text: "No speech detected" }));
+              }
             } else {
-              ws.send(JSON.stringify({ type: "error", text: "No speech detected" }));
+              const transcription = await transcribeAudio(pcmBuffer);
+              console.log(`Transcription: "${transcription}"`);
+              if (transcription.trim()) {
+                ws.send(JSON.stringify({ type: "preview", text: transcription }));
+              } else {
+                ws.send(JSON.stringify({ type: "error", text: "No speech detected" }));
+              }
             }
           } catch (err) {
             console.error("Transcription error:", err);

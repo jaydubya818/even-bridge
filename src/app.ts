@@ -22,6 +22,36 @@ export function setActiveMessenger(m: Messenger): void {
 // --- Express app ---
 const app = express();
 
+// DEV-only: redirect root to meeting-assistant overlay when integration is enabled
+if (process.env.DEV_MEETING_ASSISTANT_OVERLAY === "true") {
+  const overlayUrl =
+    process.env.MEETING_ASSISTANT_OVERLAY_URL ??
+    "http://localhost:3000/even-hub/overlay";
+  const port = process.env.PORT || "3000";
+
+  app.get("/health", (_req, res) => {
+    res.json({
+      status: "ok",
+      bridgeMode: true,
+      overlayUrl: process.env.MEETING_ASSISTANT_OVERLAY_URL ?? null,
+    });
+  });
+
+  app.get("/", (req, res) => {
+    const proto =
+      req.protocol === "https" || req.get("x-forwarded-proto") === "https"
+        ? "wss"
+        : "ws";
+    const host = req.get("x-forwarded-host") || req.get("host") || `localhost:${port}`;
+    const url = new URL(overlayUrl);
+    url.searchParams.set("bridgeWsUrl", `${proto}://${host}/ws`);
+    for (const [k, v] of Object.entries(req.query)) {
+      if (typeof v === "string") url.searchParams.set(k, v);
+    }
+    res.redirect(url.toString());
+  });
+}
+
 const noCacheHtml: express.RequestHandler = (_req, res, next) => {
   if (_req.path === "/" || _req.path.endsWith(".html")) {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
